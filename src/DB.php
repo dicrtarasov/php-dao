@@ -35,6 +35,8 @@ class DB
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_FOUND_ROWS => true,
+            PDO::MYSQL_ATTR_MULTI_STATEMENTS => false
         ];
 
         $this->pdo = new PDO($dsn, $user, $pass, $opt);
@@ -111,8 +113,13 @@ class DB
      */
     public function queryRes(string $sql, array $params=[])
     {
-        $stmt = $this->pdo->prepare($sql);
-        $this->exec($params);
+        if (empty($params)) {
+            $stmt = $this->pdo->query($sql);
+        } else {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->exec($params);
+        }
+
         return $stmt;
     }
 

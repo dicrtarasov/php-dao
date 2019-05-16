@@ -1,0 +1,36 @@
+{
+	"name" : "dicr/php-dao",
+	"description" : "Simple Dao for PHP",
+	"type" : "library",
+	"authors" : [{
+			"name" : "Igor Tarasov",
+			"email" : "develop@dicr.org",
+			"homepage" : "http://dicr.org",
+			"role" : "developer"
+		}
+	],
+	"minimum-stability" : "stable",
+	"autoload" : {
+		"psr-4" : {
+			"dicr\\dao\\" : "src"
+		}
+	},
+	"keywords" : [
+		"php db dao"
+	],
+	"require" : {
+		"php" : "~7"
+	},
+	"repositories" : [{
+			"type" : "composer",
+			"url" : "https://asset-packagist.org"
+		}, {
+			"type" : "git",
+			"url" : "https://gitlab.com/dicr/php-dao.git"
+		}
+	],
+	"homepage" : "https://gitlab.com/dicr/php-dao",
+	"support" : {
+		"source" : "https://gitlab.com/dicr/php-dao.git"
+	}
+}

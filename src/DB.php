@@ -15,33 +15,47 @@ class DB
     private $pdo;
 
     /** @var static */
-    private $instance;
+    private static $instance;
 
     /**
      * Конструктор
      *
-     * @param string $host
+     * @param string $dsn
      * @param string $user
      * @param string $pass
-     * @param string $db
-     * @param string $charset
-     * @throws \PDOException
+     * @param array|false $opts
      */
-    public function construct(string $host, string $user, string $pass, string $db, string $charset = 'utf8')
+    public function __construct(string $dsn, string $user=null, string $pass=null, $opts = [])
     {
-        $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', $host, $db, $charset);
+        if ($opts !== false) {
+            $opts = array_merge([
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ], $opts);
+        }
 
-        $opt = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-            PDO::MYSQL_ATTR_FOUND_ROWS => true,
-            PDO::MYSQL_ATTR_MULTI_STATEMENTS => false
-        ];
+        $this->pdo = new \PDO($dsn, $user, $pass, $opts ?: []);
 
-        $this->pdo = new PDO($dsn, $user, $pass, $opt);
+        if ($opts === false) {
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        }
 
         self::$instance = $this;
+    }
+
+    /**
+     * Создает DNS по имени хоста и базы данных.
+     *
+     * @param string $driver
+     * @param string $host
+     * @param string $db
+     * @param string $charset
+     */
+    public static function createDSN(string $driver, string $host, string $db, string $charset = 'utf8')
+    {
+        return sprintf('%s:host=%s;dbname=%s;charset=%s', $driver, $host, $db, $charset);
     }
 
     /**
@@ -52,18 +66,6 @@ class DB
     public static function instance()
     {
         return self::$instance;
-    }
-
-    /**
-     * Перегрузка статических методов.
-     *
-     * @param string $method
-     * @param array $args
-     * @return mixed
-     */
-    public static function __callStatic(string $method, array $args)
-    {
-        return call_user_func_array([self::instance(), $method], $args);
     }
 
     /**
@@ -134,16 +136,11 @@ class DB
         $stmt = $this->queryRes($sql);
 
         $ret = new \stdClass();
-        $ret->num_rows = $stmt->rowCount();
-        $ret->rows = [];
-        $ret->row = null;
 
-        if ($ret->num_rows > 0 && $stmt->columnCount() > 0) {
-            $ret->rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            if (isset($ret->rows[0])) {
-                $ret->row = $ret->rows[0];
-            }
-        }
+        // если запрос select, то должно быь columnCout
+        $ret->rows = $stmt->columnCount() > 0 ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        $ret->row = $ret->rows[0] ?? null;
+        $ret->num_rows = count($ret->rows);
 
         $stmt->closeCursor();
 
@@ -161,12 +158,7 @@ class DB
     public function queryAll(string $sql, array $params = [], string $class = '')
     {
         $stmt = $this->queryRes($sql, $params);
-
-        $ret = [];
-        if ($stmt->rowCount() > 0) {
-            $ret = !empty($class) ? $stmt->fetchAll(PDO::FETCH_CLASS, $class) : $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
-
+        $ret = !empty($class) ? $stmt->fetchAll(PDO::FETCH_CLASS, $class) : $stmt->fetchAll(PDO::FETCH_ASSOC);
         $stmt->closeCursor();
         return $ret ?: [];
     }
@@ -182,7 +174,7 @@ class DB
     public function queryColumn(string $sql, array $params = [], int $column = null)
     {
         $stmt = $this->queryRes($sql, $params);
-        $ret = $stmt->rowCount() > 0 ? $stmt->fetchColumn($column) : [];
+        $ret = $stmt->fetchAll(PDO::FETCH_COLUMN, $column);
         $stmt->closeCursor();
         return $ret ?: [];
     }
@@ -197,7 +189,7 @@ class DB
     public function queryKeyPair(string $sql, array $params = [])
     {
         $stmt = $this->queryRes($sql, $params);
-        $ret = $stmt->rowCount() > 0 ? $stmt->fetch(PDO::FETCH_KEY_PAIR) : [];
+        $ret = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
         $stmt->closeCursor();
         return $ret ?: [];
     }
@@ -213,12 +205,7 @@ class DB
     public function queryOne(string $sql, array $params = [], string $class = null)
     {
         $stmt = $this->queryRes($sql, $params);
-
-        $ret = null;
-        if ($stmt->rowCount() > 0) {
-            $ret = !empty($class) ? $stmt->fetchObject($class) : $stmt->fetch(PDO::FETCH_ASSOC);
-        }
-
+        $ret = !empty($class) ? $stmt->fetchObject($class) : $stmt->fetch(PDO::FETCH_ASSOC);
         $stmt->closeCursor();
         return $ret ?: null;
     }
@@ -233,12 +220,11 @@ class DB
      */
     public function queryScalar(string $sql, array $params = [], int $column = null)
     {
-        $stmt = $this->queryRes($sql, $params);
-        $ret = $stmt->rowCount() > 0 ? $stmt->fetch(PDO::FETCH_NUM) : null;
-        $stmt->closeCursor();
-
         $column = (int)$column;
-        return !empty($ret) && array_key_exists($column, $ret) ? $ret[$column] : null;
+        $stmt = $this->queryRes($sql, $params);
+        $ret = $stmt->fetchColumn($column);
+        $stmt->closeCursor();
+        return $ret !== false ? $ret : null;
     }
 
     /**

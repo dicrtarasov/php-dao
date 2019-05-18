@@ -32,5 +32,13 @@
 	"homepage" : "https://gitlab.com/dicr/php-dao",
 	"support" : {
 		"source" : "https://gitlab.com/dicr/php-dao.git"
+	},
+	"require-dev" : {
+		"phpunit/phpunit" : "~8.1"
+	},
+	"autoload-dev" : {
+		"psr-4" : {
+			"\\dicr\\dao\\tests\\" : "tests"
+		}
 	}
 }
